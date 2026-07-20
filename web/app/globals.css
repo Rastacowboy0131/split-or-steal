@@ -1,0 +1,85 @@
+:root {
+  --bg: #0b0b12;
+  --panel: #14141f;
+  --panel2: #1b1b2a;
+  --gold: #f5c542;
+  --pink: #ff4d8d;
+  --teal: #35e0c8;
+  --text: #eceaf4;
+  --muted: #8b8aa0;
+  --danger: #ff5252;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: radial-gradient(1200px 600px at 50% -10%, #241b3a 0%, var(--bg) 60%);
+  color: var(--text);
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+  min-height: 100vh;
+}
+.container { max-width: 1080px; margin: 0 auto; padding: 24px; }
+header.topbar { display: flex; justify-content: space-between; align-items: center; padding: 18px 0; }
+.logo { font-size: 1.6rem; font-weight: 900; letter-spacing: 1px; }
+.logo .split { color: var(--teal); }
+.logo .steal { color: var(--pink); }
+.logo .sub { display: block; font-size: 0.75rem; color: var(--muted); font-weight: 500; letter-spacing: 3px; text-transform: uppercase; }
+.btn {
+  background: linear-gradient(135deg, var(--pink), #b3186a);
+  color: white; border: none; padding: 10px 22px; border-radius: 10px;
+  font-weight: 700; cursor: pointer; font-size: 0.95rem;
+  transition: transform 0.1s, box-shadow 0.2s;
+}
+.btn:hover { transform: translateY(-1px); box-shadow: 0 4px 20px rgba(255, 77, 141, 0.4); }
+.btn.ghost { background: var(--panel2); border: 1px solid #33334d; }
+.btn.teal { background: linear-gradient(135deg, var(--teal), #0e8f7d); color: #05231e; }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; box-shadow: none; }
+.jackpot {
+  text-align: center; margin: 32px 0 40px;
+}
+.jackpot .label { color: var(--muted); text-transform: uppercase; letter-spacing: 4px; font-size: 0.8rem; }
+.jackpot .amount {
+  font-size: 4rem; font-weight: 900; color: var(--gold);
+  text-shadow: 0 0 40px rgba(245, 197, 66, 0.35);
+}
+.jackpot .note { color: var(--muted); font-size: 0.85rem; }
+.badge {
+  display: inline-block; padding: 3px 10px; border-radius: 999px;
+  font-size: 0.72rem; font-weight: 700; letter-spacing: 1px;
+}
+.badge.demo { background: #3a2a10; color: var(--gold); border: 1px solid #6b4e1c; }
+.badge.live { background: #10321f; color: #4ade80; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 18px; }
+.card {
+  background: var(--panel); border: 1px solid #26263a; border-radius: 16px; padding: 22px;
+}
+.card h3 { margin-bottom: 6px; }
+.tier-bronze h3 { color: #d19a5f; }
+.tier-silver h3 { color: #c9ccd6; }
+.tier-gold h3 { color: var(--gold); }
+.card .row { display: flex; justify-content: space-between; padding: 5px 0; font-size: 0.9rem; }
+.card .row .k { color: var(--muted); }
+.card .btn { width: 100%; margin-top: 14px; }
+section { margin: 42px 0; }
+section > h2 { margin-bottom: 16px; font-size: 1.2rem; letter-spacing: 1px; }
+.game-list .card { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; padding: 14px 20px; }
+.mask { font-family: monospace; color: var(--muted); }
+.choice { font-weight: 800; }
+.choice.split { color: var(--teal); }
+.choice.steal { color: var(--pink); }
+.choice.hidden-choice { color: var(--muted); }
+.arena { text-align: center; padding: 30px 0; }
+.arena .vs { font-size: 2rem; font-weight: 900; color: var(--gold); margin: 10px 0; }
+.timer { font-size: 2.4rem; font-weight: 900; font-variant-numeric: tabular-nums; }
+.timer.low { color: var(--danger); }
+.phase { text-transform: uppercase; letter-spacing: 3px; color: var(--muted); font-size: 0.8rem; }
+.choices { display: flex; gap: 16px; justify-content: center; margin: 26px 0; }
+.choice-btn {
+  padding: 26px 40px; border-radius: 18px; border: 2px solid #33334d;
+  background: var(--panel2); color: var(--text); font-size: 1.3rem; font-weight: 900;
+  cursor: pointer; transition: all 0.15s;
+}
+.choice-btn.split-btn:hover, .choice-btn.split-btn.sel { border-color: var(--teal); box-shadow: 0 0 30px rgba(53, 224, 200, 0.3); }
+.choice-btn.steal-btn:hover, .choice-btn.steal-btn.sel { border-color: var(--pink); box-shadow: 0 0 30px rgba(255, 77, 141, 0.3); }
+.rules { color: var(--muted); font-size: 0.9rem; line-height: 1.7; }
+.rules b { color: var(--text); }
+footer { text-align: center; color: var(--muted); padding: 40px 0 20px; font-size: 0.8rem; }
+.addr { font-family: monospace; font-size: 0.85rem; }
