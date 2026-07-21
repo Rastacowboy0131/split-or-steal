@@ -167,7 +167,7 @@ function GameScreen({ room, onExit }) {
   useEffect(() => {
     if (secs > 0) return;
     if (phase === "queue") { setPhase("commit"); setSecs(30); }
-    else if (phase === "commit") { setPhase("reveal"); setSecs(300); }
+    else if (phase === "commit") { setPhase("reveal"); setSecs(30); }
     else if (phase === "reveal") { finishDemo(); }
   }, [secs, phase]);
 

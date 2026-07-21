@@ -35,7 +35,7 @@ contract SplitOrSteal is Ownable, ReentrancyGuard {
 
     IERC20 public sosToken; // placeholder until $SoS launches; address(0) disables hold check
     uint64 public commitWindow = 30;    // seconds to lock in your choice
-    uint64 public revealWindow = 300;   // generous reveal window
+    uint64 public revealWindow = 30;    // seconds to reveal
 
     // global entry cap: max games settled-or-started per period
     uint32 public maxGamesPerPeriod = 20;
