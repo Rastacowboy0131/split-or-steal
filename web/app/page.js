@@ -81,7 +81,7 @@ function Lobby({ onPlay }) {
       </div>
 
       <section>
-        <h2>Choose Your Room</h2>
+        <h2>The Room</h2>
         <div className="grid">
           {DEMO_ROOMS.map((r) => (
             <div key={r.id} className={`card ${r.cls}`}>
@@ -136,7 +136,7 @@ function Lobby({ onPlay }) {
       <section>
         <h2>How It Works</h2>
         <div className="card rules">
-          <p><b>Free entry.</b> Hold enough $SoS for your room tier and you are in. No stake, no risk.</p>
+          <p><b>Free entry.</b> Hold the minimum $SoS and you are in. No stake, no risk.</p>
           <p><b>Both HUG (split):</b> you share half the round pot, a quarter each. The other half rolls back into the jackpot.</p>
           <p><b>One RUGS (steal):</b> the stealer takes half the round pot. The splitter gets nothing. The rest rolls over.</p>
           <p><b>Both RUG:</b> nobody gets paid. The whole pot rolls back into the jackpot.</p>
@@ -207,7 +207,7 @@ function GameScreen({ room, onExit }) {
     <div className="arena">
       <button className="btn ghost" onClick={onExit} style={{ float: "left" }}>Back to Lobby</button>
       <div style={{ clear: "both" }} />
-      <h2 style={{ margin: "18px 0 4px" }}>{room?.tier || "Bronze"} Room</h2>
+      <h2 style={{ margin: "18px 0 4px" }}>{room?.tier || "The Room"}</h2>
       <div className="vs">
         <span className="mask">you</span> VS <span className="mask">{phase === "queue" ? "finding opponent..." : "0x????...????"}</span>
       </div>
