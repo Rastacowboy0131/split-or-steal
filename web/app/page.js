@@ -6,6 +6,8 @@ import { formatEther, toHex } from "viem";
 import { wagmiConfig, CONTRACT_ADDRESS, CONTRACT_ABI, DEMO_MODE } from "../lib/config";
 import { DEMO_JACKPOT, DEMO_ROOMS, DEMO_LIVE_GAMES, DEMO_PAST_GAMES, DEMO_TICKER_EVENTS } from "../lib/demo";
 import RevealScene from "./RevealScene";
+import { useLive } from "../lib/useLive";
+import { LiveGameCard, ChatPanel } from "./Live";
 import * as snd from "../lib/sound";
 
 const qc = new QueryClient();
@@ -88,7 +90,7 @@ function TopBar() {
 }
 
 // Live jackpot value. In demo mode it slowly inflates to simulate fee inflow.
-function useJackpot() {
+function useJackpot(live) {
   const { data } = useReadContract({
     address: CONTRACT_ADDRESS || undefined,
     abi: CONTRACT_ABI,
@@ -108,6 +110,10 @@ function useJackpot() {
     return () => clearInterval(t);
   }, []);
 
+  // Realtime feed wins when connected.
+  if (live?.connected && live.jackpot != null) {
+    return { value: live.jackpot, lastBump: live.jackpotBump };
+  }
   if (DEMO_MODE) return { value: demoValue, lastBump };
   return { value: data != null ? parseFloat(formatEther(data)) : null, lastBump: null };
 }
@@ -181,8 +187,8 @@ function JackpotTicker({ lastBump }) {
   );
 }
 
-function Jackpot() {
-  const { value, lastBump } = useJackpot();
+function Jackpot({ live }) {
+  const { value, lastBump } = useJackpot(live);
   const display = useCountUp(value);
   return (
     <div className="jackpot">
@@ -195,9 +201,12 @@ function Jackpot() {
 }
 
 function Lobby({ onPlay }) {
+  const live = useLive();
+  const showLive = live.connected && live.games.length > 0;
+  const recentGames = live.connected && live.recent.length > 0 ? live.recent : DEMO_PAST_GAMES;
   return (
     <>
-      <Jackpot />
+      <Jackpot live={live} />
 
       <section>
         <h2>The Room</h2>
@@ -216,27 +225,31 @@ function Lobby({ onPlay }) {
       </section>
 
       <section>
-        <h2>Live Games</h2>
+        <h2>Live Games {live.connected && <span className="badge live">LIVE</span>}</h2>
         <div className="game-list">
-          {DEMO_LIVE_GAMES.map((g) => (
-            <div key={g.id} className="card">
-              <div>
-                <b>#{g.id}</b> <span className="badge demo">{g.tier}</span>{" "}
-                <span className="mask">{g.p1}</span> vs <span className="mask">{g.p2}</span>
-              </div>
-              <div>
-                <span className="phase">{g.phase}</span>{" "}
-                <span className="choice hidden-choice">choices hidden</span>
-              </div>
-            </div>
-          ))}
+          {showLive
+            ? live.games.map((g) => <LiveGameCard key={g.id} game={g} />)
+            : DEMO_LIVE_GAMES.map((g) => (
+                <div key={g.id} className="card">
+                  <div>
+                    <b>#{g.id}</b> <span className="badge demo">{g.tier}</span>{" "}
+                    <span className="mask">{g.p1}</span> vs <span className="mask">{g.p2}</span>
+                  </div>
+                  <div>
+                    <span className="phase">{g.phase}</span>{" "}
+                    <span className="choice hidden-choice">choices hidden</span>
+                  </div>
+                </div>
+              ))}
         </div>
       </section>
+
+      {live.available && <ChatPanel chat={live.chat} sendChat={live.sendChat} connected={live.connected} />}
 
       <section>
         <h2>Recent Results</h2>
         <div className="game-list">
-          {DEMO_PAST_GAMES.map((g) => (
+          {recentGames.map((g) => (
             <div key={g.id} className="card">
               <div>
                 <b>#{g.id}</b> <span className="badge demo">{g.tier}</span>{" "}
