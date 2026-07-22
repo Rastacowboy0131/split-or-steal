@@ -5,7 +5,7 @@ import { useState, useEffect, useRef } from "react";
 import * as snd from "../lib/sound";
 
 // outcome: "hug" | "youSteal" | "themSteal" | "doubleSteal" | "youAfk" | "themAfk"
-export default function RevealScene({ myChoice, oppChoice, meAfk, onDone }) {
+export default function RevealScene({ myChoice, oppChoice, meAfk, potLabel, onDone }) {
   const outcome = meAfk
     ? "youAfk"
     : oppChoice === "AFK"
@@ -63,8 +63,8 @@ export default function RevealScene({ myChoice, oppChoice, meAfk, onDone }) {
         <Character side="left" color="var(--teal)" outcome={outcome} acting={stage === "act"} />
         <div className="stage-mid">
           {stage === "act" && outcome === "hug" && <Hearts />}
-          {stage === "act" && outcome === "doubleSteal" && <FlyingPot />}
         </div>
+        <PotTable label={potLabel} mode={stage === "act" ? outcome : "idle"} />
         <Character side="right" color="var(--pink)" outcome={outcome} acting={stage === "act"} />
       </div>
     </div>
@@ -97,8 +97,59 @@ function Hearts() {
   );
 }
 
-function FlyingPot() {
-  return <div className="flying-pot">{"\uD83D\uDCB0"}</div>;
+// Gold coin stack that sits on the table. Rendered as inline SVG so it can split in half.
+function PotCoins({ half }) {
+  // half: undefined = full stack, "left" or "right" = clipped half for the split animation
+  const clip = half === "left" ? { x: 0, w: 30 } : half === "right" ? { x: 30, w: 30 } : null;
+  return (
+    <svg viewBox={clip ? `${clip.x} 0 ${clip.w} 40` : "0 0 60 40"} width={clip ? 26 : 52} height={36} aria-hidden="true">
+      <g stroke="#a8781a" strokeWidth="1.5">
+        <ellipse cx="18" cy="33" rx="14" ry="5" fill="var(--gold)" />
+        <ellipse cx="18" cy="28" rx="14" ry="5" fill="#ffd966" />
+        <ellipse cx="42" cy="33" rx="14" ry="5" fill="var(--gold)" />
+        <ellipse cx="42" cy="28" rx="14" ry="5" fill="#ffd966" />
+        <ellipse cx="30" cy="21" rx="14" ry="5" fill="var(--gold)" />
+        <ellipse cx="30" cy="16" rx="14" ry="5" fill="#ffd966" />
+      </g>
+      {/* ETH diamond mark on the top coin */}
+      <path d="M30 10 l5 6 -5 4 -5 -4 z" fill="#7a5a10" opacity="0.85" />
+    </svg>
+  );
+}
+
+// Table with the round pot on top. mode: "idle" or an outcome name.
+// idle -> subtle glow pulse; hug -> pot splits toward both players;
+// youSteal / themAfk -> pot slides to the left player; themSteal / youAfk -> to the right;
+// doubleSteal -> pot flies up toward the jackpot.
+export function PotTable({ label, mode = "idle" }) {
+  const split = mode === "hug";
+  const toLeft = mode === "youSteal" || mode === "themAfk";
+  const toRight = mode === "themSteal" || mode === "youAfk";
+  const fly = mode === "doubleSteal";
+  return (
+    <div className={`pot-table mode-${mode}`}>
+      <div className="pot-spot">
+        {split ? (
+          <>
+            <div className="pot pot-half pot-half-left"><PotCoins half="left" /></div>
+            <div className="pot pot-half pot-half-right"><PotCoins half="right" /></div>
+          </>
+        ) : (
+          <div className={`pot ${toLeft ? "pot-to-left" : toRight ? "pot-to-right" : fly ? "pot-fly" : "pot-idle"}`}>
+            <PotCoins />
+          </div>
+        )}
+        <div className={`pot-amount ${fly || split || toLeft || toRight ? "pot-amount-fade" : ""}`}>{label || "0.5 ETH"}</div>
+      </div>
+      <svg className="table-svg" viewBox="0 0 140 46" width="128" height="42" aria-hidden="true">
+        <ellipse cx="70" cy="8" rx="66" ry="7" fill="#2a2a44" stroke="#3a3a5c" strokeWidth="1.5" />
+        <rect x="8" y="8" width="124" height="7" rx="3" fill="#1e1e33" />
+        <rect x="22" y="14" width="8" height="30" rx="3" fill="#26263e" />
+        <rect x="110" y="14" width="8" height="30" rx="3" fill="#26263e" />
+        <ellipse cx="70" cy="6" rx="40" ry="3.5" fill="rgba(245,197,66,0.08)" />
+      </svg>
+    </div>
+  );
 }
 
 // Simple inline SVG cartoon character. Behavior derives from outcome and side.

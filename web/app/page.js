@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { formatEther, toHex } from "viem";
 import { wagmiConfig, CONTRACT_ADDRESS, CONTRACT_ABI, DEMO_MODE } from "../lib/config";
 import { DEMO_JACKPOT, DEMO_ROOMS, DEMO_LIVE_GAMES, DEMO_PAST_GAMES, DEMO_TICKER_EVENTS } from "../lib/demo";
-import RevealScene from "./RevealScene";
+import RevealScene, { PotTable } from "./RevealScene";
 import { useLive } from "../lib/useLive";
 import { LiveGameCard, ChatPanel } from "./Live";
 import * as snd from "../lib/sound";
@@ -379,6 +379,13 @@ function GameScreen({ room, onExit }) {
         </div>
       )}
 
+      {(phase === "commit" || phase === "reveal") && (
+        <div className="wait-pot">
+          <PotTable label={room?.pot} mode="idle" />
+          <div className="wait-pot-note">round pot on the table</div>
+        </div>
+      )}
+
       {phase === "reveal" && committed && !revealed && (
         <div style={{ margin: "26px 0" }}>
           <p style={{ color: "var(--muted)", marginBottom: 14 }}>Choice locked and hidden. Reveal before the timer runs out or you are treated as AFK.</p>
@@ -391,6 +398,7 @@ function GameScreen({ room, onExit }) {
           myChoice={myChoice === "AFK" ? "SPLIT" : myChoice}
           oppChoice={oppChoice}
           meAfk={meAfk}
+          potLabel={room?.pot}
           onDone={() => setPhase("result")}
         />
       )}
