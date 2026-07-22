@@ -1,10 +1,12 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { WagmiProvider, useAccount, useConnect, useDisconnect, useReadContract } from "wagmi";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { formatEther, keccak256, encodePacked, toHex } from "viem";
+import { formatEther, toHex } from "viem";
 import { wagmiConfig, CONTRACT_ADDRESS, CONTRACT_ABI, DEMO_MODE } from "../lib/config";
-import { DEMO_JACKPOT, DEMO_ROOMS, DEMO_LIVE_GAMES, DEMO_PAST_GAMES } from "../lib/demo";
+import { DEMO_JACKPOT, DEMO_ROOMS, DEMO_LIVE_GAMES, DEMO_PAST_GAMES, DEMO_TICKER_EVENTS } from "../lib/demo";
+import RevealScene from "./RevealScene";
+import * as snd from "../lib/sound";
 
 const qc = new QueryClient();
 
@@ -20,6 +22,14 @@ export default function Page() {
 
 function App() {
   const [view, setView] = useState({ screen: "lobby" }); // lobby | game
+
+  // Init audio on the first user gesture anywhere on the page.
+  useEffect(() => {
+    const boot = () => { snd.initAudio(); window.removeEventListener("pointerdown", boot); };
+    window.addEventListener("pointerdown", boot);
+    return () => window.removeEventListener("pointerdown", boot);
+  }, []);
+
   return (
     <div className="container">
       <TopBar />
@@ -33,6 +43,23 @@ function App() {
   );
 }
 
+function MuteButton() {
+  const [muted, setMutedState] = useState(false);
+  useEffect(() => { setMutedState(snd.isMuted()); }, []);
+  function toggle() {
+    snd.initAudio();
+    const next = !muted;
+    snd.setMuted(next);
+    setMutedState(next);
+    if (!next) snd.tick();
+  }
+  return (
+    <button className="btn ghost mute-btn" onClick={toggle} aria-label={muted ? "Unmute sounds" : "Mute sounds"} title={muted ? "Unmute" : "Mute"}>
+      {muted ? "\uD83D\uDD07" : "\uD83D\uDD0A"}
+    </button>
+  );
+}
+
 function TopBar() {
   const { address, isConnected } = useAccount();
   const { connect, connectors } = useConnect();
@@ -43,8 +70,9 @@ function TopBar() {
         <span className="split">SPLIT</span> or <span className="steal">STEAL</span>
         <span className="sub">Hug or Rug</span>
       </div>
-      <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+      <div className="topbar-actions">
         {DEMO_MODE ? <span className="badge demo">DEMO MODE</span> : <span className="badge live">LIVE</span>}
+        <MuteButton />
         {isConnected ? (
           <button className="btn ghost" onClick={() => disconnect()}>
             <span className="addr">{address?.slice(0, 6)}...{address?.slice(-4)}</span>
@@ -59,6 +87,7 @@ function TopBar() {
   );
 }
 
+// Live jackpot value. In demo mode it slowly inflates to simulate fee inflow.
 function useJackpot() {
   const { data } = useReadContract({
     address: CONTRACT_ADDRESS || undefined,
@@ -66,19 +95,109 @@ function useJackpot() {
     functionName: "jackpot",
     query: { enabled: !DEMO_MODE },
   });
-  if (DEMO_MODE) return DEMO_JACKPOT;
-  return data != null ? formatEther(data) : "...";
+  const [demoValue, setDemoValue] = useState(parseFloat(DEMO_JACKPOT));
+  const [lastBump, setLastBump] = useState(null);
+
+  useEffect(() => {
+    if (!DEMO_MODE) return;
+    const t = setInterval(() => {
+      const inc = 0.01 + Math.random() * 0.09;
+      setDemoValue((v) => v + inc);
+      setLastBump({ amount: inc, at: Date.now() });
+    }, 6000 + Math.random() * 4000);
+    return () => clearInterval(t);
+  }, []);
+
+  if (DEMO_MODE) return { value: demoValue, lastBump };
+  return { value: data != null ? parseFloat(formatEther(data)) : null, lastBump: null };
+}
+
+// Smooth count-up toward a moving target using requestAnimationFrame.
+function useCountUp(target) {
+  const [display, setDisplay] = useState(target ?? 0);
+  const displayRef = useRef(target ?? 0);
+  const raf = useRef(null);
+
+  useEffect(() => {
+    if (target == null) return;
+    cancelAnimationFrame(raf.current);
+    const start = displayRef.current;
+    const diff = target - start;
+    if (Math.abs(diff) < 0.0001) return;
+    const dur = 1200;
+    const t0 = performance.now();
+    const step = (now) => {
+      const p = Math.min(1, (now - t0) / dur);
+      const eased = 1 - Math.pow(1 - p, 3);
+      const v = start + diff * eased;
+      displayRef.current = v;
+      setDisplay(v);
+      if (p < 1) raf.current = requestAnimationFrame(step);
+    };
+    raf.current = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf.current);
+  }, [target]);
+
+  return display;
+}
+
+// Streaming event ticker under the jackpot.
+function JackpotTicker({ lastBump }) {
+  const [items, setItems] = useState([]);
+  const idRef = useRef(0);
+
+  const push = useCallback((text, cls) => {
+    idRef.current += 1;
+    const id = idRef.current;
+    setItems((prev) => [{ id, text, cls }, ...prev].slice(0, 4));
+  }, []);
+
+  // Fee bumps from the jackpot hook.
+  useEffect(() => {
+    if (lastBump) push(`+${lastBump.amount.toFixed(3)} ETH from fees`, "fee");
+  }, [lastBump, push]);
+
+  // Ambient demo events on their own slower cadence.
+  useEffect(() => {
+    if (!DEMO_MODE) return;
+    let i = 0;
+    const t = setInterval(() => {
+      const ev = DEMO_TICKER_EVENTS[i % DEMO_TICKER_EVENTS.length];
+      i += 1;
+      push(ev.text, ev.cls);
+    }, 11000);
+    return () => clearInterval(t);
+  }, [push]);
+
+  if (items.length === 0) return <div className="ticker" />;
+  return (
+    <div className="ticker">
+      {items.map((it, idx) => (
+        <div key={it.id} className={`ticker-item ${it.cls} ${idx === 0 ? "fresh" : ""}`}>
+          {it.text}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function Jackpot() {
+  const { value, lastBump } = useJackpot();
+  const display = useCountUp(value);
+  return (
+    <div className="jackpot">
+      <div className="label">Community Jackpot</div>
+      <div className="amount">{value == null ? "..." : display.toFixed(2)} <span className="unit">ETH</span></div>
+      <div className="note">Funded by $SoS trading fees. Every rug rolls it higher.</div>
+      <JackpotTicker lastBump={lastBump} />
+    </div>
+  );
 }
 
 function Lobby({ onPlay }) {
-  const jackpot = useJackpot();
   return (
     <>
-      <div className="jackpot">
-        <div className="label">Community Jackpot</div>
-        <div className="amount">{jackpot} ETH</div>
-        <div className="note">Funded by $SoS trading fees. Every rug rolls it higher.</div>
-      </div>
+      <Jackpot />
 
       <section>
         <h2>The Room</h2>
@@ -148,15 +267,14 @@ function Lobby({ onPlay }) {
   );
 }
 
-const PHASES = ["queue", "commit", "reveal", "result"];
-
 function GameScreen({ room, onExit }) {
-  const [phase, setPhase] = useState("queue");
+  const [phase, setPhase] = useState("queue"); // queue | commit | reveal | cinematic | result
   const [choice, setChoice] = useState(null);
   const [committed, setCommitted] = useState(false);
   const [revealed, setRevealed] = useState(false);
   const [secs, setSecs] = useState(8);
   const [oppChoice, setOppChoice] = useState(null);
+  const [meAfk, setMeAfk] = useState(false);
 
   // demo state machine with countdowns
   useEffect(() => {
@@ -164,14 +282,24 @@ function GameScreen({ room, onExit }) {
     return () => clearInterval(t);
   }, []);
 
+  // Timer sounds: soft tick each second, heartbeat under 10s.
+  useEffect(() => {
+    if (phase !== "commit" && phase !== "reveal") return;
+    if (secs <= 0) return;
+    if (secs <= 10) snd.heartbeat();
+    else snd.tick();
+  }, [secs, phase]);
+
   useEffect(() => {
     if (secs > 0) return;
     if (phase === "queue") { setPhase("commit"); setSecs(30); }
-    else if (phase === "commit") { setPhase("reveal"); setSecs(30); }
-    else if (phase === "reveal") { finishDemo(); }
+    else if (phase === "commit") { setMeAfk(true); startReveal(null); }
+    else if (phase === "reveal") { setMeAfk(!revealed); startReveal(revealed ? choice : null); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [secs, phase]);
 
   function commitChoice(c) {
+    snd.initAudio();
     setChoice(c);
     // real flow: salt = random 32 bytes stored locally, then contract.commit(gameId, keccak256(choice, salt, address))
     if (!DEMO_MODE) {
@@ -180,23 +308,29 @@ function GameScreen({ room, onExit }) {
       // wagmi writeContract call would go here with CONTRACT_ADDRESS
     }
     setCommitted(true);
-    if (phase === "commit") { setPhase("reveal"); setSecs(300); }
+    if (phase === "commit") { setPhase("reveal"); setSecs(30); }
   }
 
   function doReveal() {
+    snd.initAudio();
     setRevealed(true);
-    finishDemo();
+    startReveal(choice);
   }
 
-  function finishDemo() {
-    setOppChoice(Math.random() < 0.5 ? "SPLIT" : "STEAL");
-    setPhase("result");
+  function startReveal(myCommittedChoice) {
+    // Opponent occasionally goes AFK in the demo, mostly picks split or steal.
+    const roll = Math.random();
+    const opp = roll < 0.08 ? "AFK" : roll < 0.54 ? "SPLIT" : "STEAL";
+    setOppChoice(opp);
+    if (myCommittedChoice == null) setMeAfk(true);
+    setPhase("cinematic");
   }
 
-  const myChoice = choice === 1 ? "SPLIT" : choice === 2 ? "STEAL" : "AFK";
+  const myChoice = meAfk ? "AFK" : choice === 1 ? "SPLIT" : choice === 2 ? "STEAL" : "AFK";
   let resultText = "";
   if (phase === "result") {
-    if (!revealed && !committed) resultText = "You went AFK. Disqualified from payout.";
+    if (meAfk) resultText = "You went AFK and passed out. Disqualified from payout.";
+    else if (oppChoice === "AFK") resultText = "Opponent went AFK. They are disqualified, you get the splitter payout.";
     else if (myChoice === "SPLIT" && oppChoice === "SPLIT") resultText = "Both hugged! You each take a quarter of the pot.";
     else if (myChoice === "STEAL" && oppChoice === "SPLIT") resultText = "You rugged them! Half the pot is yours.";
     else if (myChoice === "SPLIT" && oppChoice === "STEAL") resultText = "You got rugged. They take half, you take nothing.";
@@ -212,9 +346,11 @@ function GameScreen({ room, onExit }) {
         <span className="mask">you</span> VS <span className="mask">{phase === "queue" ? "finding opponent..." : "0x????...????"}</span>
       </div>
 
-      <div className="phase">{phase === "queue" ? "Matchmaking" : phase === "commit" ? "Lock your choice" : phase === "reveal" ? "Reveal phase" : "Result"}</div>
-      {phase !== "result" && (
-        <div className={`timer ${secs < 15 ? "low" : ""}`}>
+      <div className="phase">
+        {phase === "queue" ? "Matchmaking" : phase === "commit" ? "Lock your choice" : phase === "reveal" ? "Reveal phase" : phase === "cinematic" ? "The moment of truth" : "Result"}
+      </div>
+      {phase !== "result" && phase !== "cinematic" && (
+        <div className={`timer ${secs < 15 ? "low" : ""} ${secs <= 10 && (phase === "commit" || phase === "reveal") ? "pulse" : ""}`}>
           {String(Math.floor(secs / 60)).padStart(2, "0")}:{String(secs % 60).padStart(2, "0")}
         </div>
       )}
@@ -237,9 +373,18 @@ function GameScreen({ room, onExit }) {
         </div>
       )}
 
+      {phase === "cinematic" && (
+        <RevealScene
+          myChoice={myChoice === "AFK" ? "SPLIT" : myChoice}
+          oppChoice={oppChoice}
+          meAfk={meAfk}
+          onDone={() => setPhase("result")}
+        />
+      )}
+
       {phase === "result" && (
         <div style={{ margin: "26px 0" }}>
-          <div style={{ fontSize: "1.4rem", margin: "12px 0" }}>
+          <div className="result-line">
             You: <span className={`choice ${myChoice === "STEAL" ? "steal" : "split"}`}>{myChoice}</span>
             {"  |  "}
             Them: <span className={`choice ${oppChoice === "STEAL" ? "steal" : "split"}`}>{oppChoice}</span>
